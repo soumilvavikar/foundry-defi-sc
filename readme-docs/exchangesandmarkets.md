@@ -28,7 +28,7 @@ AMMs, in contrast to traditional CLOBs, pre-fund both sides of the trade using `
 
 ## Yield Farming
 
-[Yield Farmin](https://chain.link/education/defi/yield-farming) is also known as `liquidity mining`, it is a new primitive neabled by DeFi that helps incentivize liquidity for a project, launching fair distribution of new tokens, and growing an active and long-lasting community.
+[Yield Farming](https://chain.link/education/defi/yield-farming) is also known as `liquidity mining`, it is a new primitive neabled by DeFi that helps incentivize liquidity for a project, launching fair distribution of new tokens, and growing an active and long-lasting community.
 
 - Yield farming incentives reward users who provide liquidity or otherwise contribute to the health of a decentralized protocol.
 - The two main goals of yield farming are:
