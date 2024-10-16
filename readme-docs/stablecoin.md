@@ -29,3 +29,44 @@ Fiat-backed stablecoins represent fiat currency on the blockchain and are backed
 - It leverages Chainlink [Proof of Reserve](https://chain.link/proof-of-reserve) to present continuous on-chain audits attesting to its 1-to-1 collateralization.
 
 ![Chainlink Proof of Reserve](readme-imgs/chainlink-proof-of-reserve.png)
+
+## Categories of Stablecoin
+
+### Relative Stability
+
+#### Pegged/Anchored
+
+The stablecoins that have their value tied to another asset. Example: USDC, DAI
+
+#### Floating
+
+The stablecoins that use math and other mechanisms to maintain a constant buying power. Example: Rye
+
+### Stability Method
+
+#### Governed
+
+There is a governing body which will be minting and burning the stablecoins. They are considered centralized, they can be made decentralized by introducing a DAO. Example: USDC, USDT.
+
+#### Algorithmic
+
+The stablecoin's stability is maintained by a permissionless decentralized algorithm and there is no human intervention. Example: DAI, Flex, Rye, and UST.
+
+### Collateral Type
+
+Collateral type == asset backing the stablecoin. Example USDC is backed by USD.
+
+How to differeniate between endogenous vs exogenous?
+
+- If the stablecoin fails, and along with it fails the underlying collateral, it will be categorized as `endogenous`, if not, `exogenous`.
+- Is the collateral developed just to be collateral OR if the collateral was created from within the protocol? If yes, its `endogenous`, if not, `exogenous`.
+
+#### Endogenous
+
+The stablecoins which use collateral that originates from inside the protocol.
+
+#### Exogenous
+
+The stablecoins which use collateral that originates from outside the protocol.
+
+![Categories of Stablecoins](readme-imgs/categories-of-stablecoin.png)
