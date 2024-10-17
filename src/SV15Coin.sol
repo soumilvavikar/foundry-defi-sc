@@ -24,7 +24,7 @@ contract SV15C is ERC20Burnable, Ownable {
     /**
      * SV15C constructor
      */
-    constructor() ERC20("SV15C", "DSV15") Ownable(address(this)) {}
+    constructor() ERC20("SV15C", "DSV15") Ownable(msg.sender) {}
 
     /**
      * @notice Mint new tokens

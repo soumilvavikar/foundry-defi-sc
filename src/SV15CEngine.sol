@@ -11,6 +11,7 @@ import {HealthFactorCalculator} from "./libs/HealthFactorCalculator.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {console} from "forge-std/console.sol";
 
 /**
  * @title SV15CEngine
@@ -75,8 +76,13 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
 
         // USD Price Feeds. ETH to USD / BTC to USD
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
+
+            console.log("tokenAddresses[i]: ", tokenAddresses[i]);
+
             s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
             i_collateralTokens[i] = tokenAddresses[i];
+
+            console.log("s_priceFeeds[tokenAddresses[i]]: ", s_priceFeeds[tokenAddresses[i]]);
         }
 
         // Setting the address of the SV15C contract

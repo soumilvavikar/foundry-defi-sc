@@ -3,6 +3,7 @@ pragma solidity ^0.8.27;
 
 import {SV15CConstants} from "./SV15CConstants.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {console} from "forge-std/console.sol";
 
 /**
  * @title PriceFeeds
@@ -21,6 +22,7 @@ library PriceFeeds {
         view
         returns (uint256 usdValueOfToken)
     {
+        console.log("priceFeedAddress: ", priceFeedAddress);
         AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeedAddress);
         (, int256 price,,,) = priceFeed.latestRoundData();
         /**
