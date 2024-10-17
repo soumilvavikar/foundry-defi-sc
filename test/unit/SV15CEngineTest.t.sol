@@ -8,6 +8,9 @@ import {SV15C} from "../../src/SV15Coin.sol";
 import {SV15CEngine} from "../../src/SV15CEngine.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {console} from "forge-std/console.sol";
+import {SV15CErrors} from "../../src/libs/SV15CErrors.sol";
+import {TestConstants} from "../libs/TestConstants.sol";
+import { ERC20Mock } from "../mocks/ERC20Mock.sol";
 
 /**
  * @title SV15CEngineTest
@@ -25,10 +28,10 @@ contract SV15CEngineTest is Test {
     address public weth;
     address public wbtc;
     uint256 public deployerKey;
-
     /**
      * @notice Setup the test
      */
+
     function setUp() public {
         // Deploy the SV15C and SV15CEngine contracts
         deploySV15C = new DeploySV15C();
@@ -36,6 +39,10 @@ contract SV15CEngineTest is Test {
 
         // Get the active network configuration
         (ethUsdPriceFeed, btcUsdPriceFeed, weth, wbtc, deployerKey) = helperConfig.activeConfig();
+
+        // Mint some WETH and WBTC to the user
+        ERC20Mock(weth).mint(TestConstants.USER, TestConstants.STARTING_USER_BALANCE);
+        ERC20Mock(wbtc).mint(TestConstants.USER, TestConstants.STARTING_USER_BALANCE);
     }
 
     /**
@@ -63,4 +70,23 @@ contract SV15CEngineTest is Test {
         console.log("expectedUsd: ", expectedUsd);
         assertEq(wbtcUsdValue, expectedUsd);
     }
+
+    /**
+     * @notice Test the depositCollateral function for allowed amount to be more than zero
+     */
+    function testRevertIfCollateralIsZero() public {
+        vm.startPrank(TestConstants.USER);
+        vm.expectRevert(SV15CErrors.SV15CEngine__AmountShouldBeMoreThanZero.selector);
+        engine.depositCollateral(weth, 0);
+        vm.stopPrank();
+    }
+
+     function testRevertsWithUnapprovedCollateral() public {
+        ERC20Mock randToken = new ERC20Mock("RAN", "RAN", TestConstants.USER, 100e18);
+        vm.startPrank(TestConstants.USER);
+        vm.expectRevert(SV15CErrors.SV15CEngine__TokenNotAllowed.selector);
+        engine.depositCollateral(address(randToken), TestConstants.COLLATERAL_AMOUNT);
+        vm.stopPrank();
+    }
+
 }
