@@ -22,9 +22,7 @@ library PriceFeeds {
         view
         returns (uint256 usdValueOfToken)
     {
-        console.log("priceFeedAddress: ", priceFeedAddress);
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeedAddress);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        int256 price = getLatestPrice(priceFeedAddress);
         /**
          * IMPORTANT:
          *  - Most USD pairs have 8 decimals, so we will just pretend they all do
@@ -42,5 +40,38 @@ library PriceFeeds {
         uint256 oneTokenValueInUsd =
             (uint256(price) * SV15CConstants.ADDITIONAL_FEED_PRECISION) / SV15CConstants.PRECISION;
         return (oneTokenValueInUsd * amountOfTokens);
+    }
+
+    function getTokenAmountFromUsd(address priceFeedAddress, uint256 usdAmountInWei) public view returns (uint256) {
+        int256 price = getLatestPrice(priceFeedAddress);
+        /**
+         * IMPORTANT:
+         *  - Most USD pairs have 8 decimals, so we will just pretend they all do
+         *  - To make calculations easier, we would have everything in terms of WEI
+         *
+         * If 1 ETH = 2000 USD and 1 ETH = 1e18 WEI
+         * price returned from price feed = 2000 * 1e8 = 2000e8
+         * additional feed precision = 1e10
+         *
+         * price * additional feed precision = 2000e18
+         *
+         * precision = nothing BUT ETH to WEI conversion. i.e. 1e18
+         * Hence, token amount FROM USD = (usdAmountinWei * precision) / (price of 1 ETH * additional feed precision)
+         *  = (usdAmountInWei * 1e18) / (2000e8 * 1e10)
+         */
+        return
+            ((usdAmountInWei * SV15CConstants.PRECISION) / (uint256(price) * SV15CConstants.ADDITIONAL_FEED_PRECISION));
+    }
+
+    /**
+     * This function will get the latest USD value of the token from the chainlink price feed.
+     *
+     * @param priceFeedAddress the address of the price feed
+     */
+    function getLatestPrice(address priceFeedAddress) private view returns (int256 price) {
+        console.log("priceFeedAddress: ", priceFeedAddress);
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeedAddress);
+        (, price,,,) = priceFeed.latestRoundData();
+        return price;
     }
 }

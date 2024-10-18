@@ -70,5 +70,5 @@ interface SV15CEngineInterface {
      * @param totalCoinsMinted: total coins minted
      * @param collateralValueInUsd: total collateral value in USD
      */
-    function calculateHealthFactor(uint256 totalCoinsMinted, uint256 collateralValueInUsd) external;
+    function calculateHealthFactor(uint256 totalCoinsMinted, uint256 collateralValueInUsd) external returns (uint256);
 }

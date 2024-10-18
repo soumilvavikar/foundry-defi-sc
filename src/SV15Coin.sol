@@ -5,6 +5,7 @@ pragma solidity ^0.8.27;
 import {ERC20Burnable, ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 // Ownable ensures that the stablecoin contract is owned by a single entity and that entity has the ability to mint and burn tokens.
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {SV15CErrors} from "./libs/SV15CErrors.sol";
 
 /**
  * @title SV15C
@@ -14,12 +15,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * Check README.md for more details.
  */
 contract SV15C is ERC20Burnable, Ownable {
-    /**
-     * Error definitions
-     */
-    error SV15C__AmountMustBeMoreThanZero();
-    error SV15C__BurnAmountExceedsBalance();
-    error SV15C__NotZeroAddress();
 
     /**
      * SV15C constructor
@@ -36,12 +31,12 @@ contract SV15C is ERC20Burnable, Ownable {
         _mint(_to, _amount);
 
         if (_to == address(0)) {
-            revert SV15C__NotZeroAddress();
+            revert SV15CErrors.SV15C__NotZeroAddress();
         }
 
         // If the amount is less than zero, don't mint, throw an error
         if (_amount <= 0) {
-            revert SV15C__AmountMustBeMoreThanZero();
+            revert SV15CErrors.SV15C__AmountMustBeMoreThanZero();
         }
 
         _mint(_to, _amount);
@@ -59,12 +54,12 @@ contract SV15C is ERC20Burnable, Ownable {
 
         // If the amount is less than zero, don't burn, throw an error
         if (_amount <= 0) {
-            revert SV15C__AmountMustBeMoreThanZero();
+            revert SV15CErrors.SV15C__AmountMustBeMoreThanZero();
         }
 
         // If the amount is more than the balance the sender has, throw an error
         if (_amount > balance) {
-            revert SV15C__BurnAmountExceedsBalance();
+            revert SV15CErrors.SV15C__BurnAmountExceedsBalance();
         }
 
         // All the checks have passed, now we can burn the _amount

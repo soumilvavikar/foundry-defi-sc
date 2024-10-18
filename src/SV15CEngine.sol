@@ -47,6 +47,7 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
     ////////                           EVENTS                                    ////////
     /////////////////////////////////////////////////////////////////////////////////////
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
+    event CollateralRedeemed(address indexed redeemedFrom, address indexed redeemedTo, address token, uint256 amount);
 
     //////////////////////////////////////////////////////////////////////////////////////
     ////////                           MODIFIERS                                 ////////
@@ -76,7 +77,6 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
 
         // USD Price Feeds. ETH to USD / BTC to USD
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
-
             console.log("tokenAddresses[i]: ", tokenAddresses[i]);
 
             s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
@@ -99,12 +99,19 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * @param tokenCollateralAddress address of the collateral
      * @param amountCollateral amount of collateral
      * @param amountSV15CToMint amount of coin to mint
+     *
+     * @notice This function will deposit the collateral and mint the coins in one transaction
      */
     function depositCollateralAndMintSV15C(
         address tokenCollateralAddress,
         uint256 amountCollateral,
         uint256 amountSV15CToMint
-    ) external override {}
+    ) external override {
+        // Deposit the collateral
+        depositCollateral(tokenCollateralAddress, amountCollateral);
+        // Mint the SV15C coins
+        mintSV15C(amountSV15CToMint);
+    }
 
     /**
      * This function will withdraw your collateral and burn SV15C in one transaction
@@ -117,47 +124,90 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
         address tokenCollateralAddress,
         uint256 amountCollateral,
         uint256 amountSV15CToBurn
-    ) external override {}
-
-    /**
-     * This function will redeem your collateral,
-     * If you have SV15C minted, you will not be able to redeem until you burn your SV15C
-     *
-     * @param tokenCollateralAddress: The ERC20 token address of the collateral you're redeeming
-     * @param amountCollateral: The amount of collateral you're redeeming
-     */
-    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) external override {}
-
-    /**
-     * This function will burn the coins. careful! You'll burn your SV15C here! Make sure you want to do this...
-     *
-     * @param amount amount of the coin to be burnt
-     *
-     * @dev you might want to use this if you're nervous `you might get liquidated` and want to just burn
-     */
-    function burnSV15C(uint256 amount) external override {}
+    ) external override {
+        // Burn the coins first
+        burnSV15C(amountSV15CToBurn);
+        // Redeem the collateral after burning the coins
+        redeemCollateral(tokenCollateralAddress, amountCollateral);
+    }
 
     /**
      * This function will liquidate the user. You can partially liquidate a user.
      *
-     * @param collateral: The ERC20 token address of the collateral you're using to make the protocol solvent again.
+     * @param collateralTokenAddress: The ERC20 token address of the collateral you're using to make the protocol solvent again.
      *                    This is collateral that you're going to take from the user who is insolvent.
      *                    In return, we would burn the coins to pay off their debt, but you don't pay off your own.
      * @param user: The user we want to liquidate.
      * @param debtToCover: The amount of coins to be burnt to cover the debt
      *
-     * @dev read more about liquidation and how it works here - https://medium.com/coinmonks/what-is-liquidation-in-defi-lending-and-borrowing-platforms-3326e0ba8d0
+     * @dev read more about liquidation and how it works here
+     *  - https://medium.com/coinmonks/what-is-liquidation-in-defi-lending-and-borrowing-platforms-3326e0ba8d0
      *
+     * @notice You can partially liquidate the user.
+     * @notice Liquidator would get the bonus for liquidating the user.
+     * @notice This function working assumes that the protocol will be roughly 150% overcollateralized in order for this
+     * to work.
+     * @notice A known bug would be if the protocol was only 100% collateralized, we wouldn't be able to liquidate
+     * anyone.
+     * For example, if the price of the collateral plummeted before anyone could be liquidated.
      */
-    function liquidate(address collateral, address user, uint256 debtToCover) external override {}
+    function liquidate(address collateralTokenAddress, address user, uint256 debtToCover)
+        external
+        override
+        moreThanZero(debtToCover)
+        nonReentrant
+    {
+        /**
+         * Initially if collateral deposited (ETH / BTC) is worth 150 USD and 100 SV15C coins are minted, the health factor is 1.5 (considering 1 USD = 1 SV15C coin)
+         * But,
+         *  - if the value of ETH drops to 100 USD, the health factor would drop to 1.0
+         *  - if the value of ETH drops to 50 USD, the health factor would drop to 0.5
+         *    - This is when the user is insolvant because at this moment 1 SV15C coin is not backed by 1 USD worth of collateral
+         *    - The collateral is taken from the user and the coins are burnt to cover the debt
+         * In our coin, the liquidation threshold is 50% (1.5 health factor).
+         * Hence, as soon as the value of ETH drops to 100 USD, the user would be liquidated.
+         *  - Now, the liquidator has the collateral (100 USD worth ETH) and the user has no debt.
+         *  - Here, the user gets a penalty for not maintaining the health factor.
+         *
+         * Liquidation is the process of selling the collateral to cover the debt.
+         */
 
-    /**
-     * This function would tell the health factor of a person.
-     *
-     * @param totalCoinsMinted: total coins minted
-     * @param collateralValueInUsd: total collateral value in USD
-     */
-    function calculateHealthFactor(uint256 totalCoinsMinted, uint256 collateralValueInUsd) external override {}
+        // Before liquidating the user, ensure the health factor of the user is less than the minimum health factor.
+        uint256 startingHealthFactor = _healthFactor(user);
+        if (startingHealthFactor >= SV15CConstants.MIN_HEALTH_FACTOR) {
+            // If the health factor of the user is greater than minimum health factor, revert.
+            revert SV15CErrors.SV15CEngine__HealthFactorOk();
+        }
+
+        // Step 1: Get the total collateral value in USD for the tokens used as collateral by the user
+        uint256 tokenAmountToCoverDebt = getTokenAmountFromUsd(collateralTokenAddress, debtToCover);
+        // Step 2: Calculate the bonus for the liquidator
+        /**
+         * Token amount to cover debt = 100 USD
+         * Bonus = 10% of the token amount to cover debt
+         * Bonus = (100 * 10) / 100 = 10 USD
+         * Liquidator would get 110 USD worth of collateral
+         */
+        uint256 bonusCollateral =
+            (tokenAmountToCoverDebt * SV15CConstants.LIQUIDATION_BONUS) / SV15CConstants.LIQUIDATION_PRECISION;
+        // Step 3: Total collateral to take from the user
+        uint256 totalCollateralToTake = tokenAmountToCoverDebt + bonusCollateral;
+
+        // Step 4: Redeem the collateral from the user
+        _redeemCollateral(collateralTokenAddress, totalCollateralToTake, user, msg.sender);
+        // Step 5: Burn the coins to cover the debt
+        _burnSV15C(debtToCover, user, msg.sender);
+
+        // Step 6: Check the health factor of the user after liquidation
+        uint256 endingHealthFactor = _healthFactor(user);
+        if (startingHealthFactor <= endingHealthFactor) {
+            // If the health factor of the user is greater than minimum health factor, revert.
+            revert SV15CErrors.SV15CEngine__HealthFactorNotImproved();
+        }
+
+        // Step 7: Check health factor of the liquidator
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     //////////////////////////////////////////////////////////////////////////////////////
     ////////                           PUBLIC FUNCTIONS                          ////////
@@ -209,9 +259,98 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
         }
     }
 
+    /**
+     * This function will burn the coins. careful! You'll burn your SV15C here! Make sure you want to do this...
+     *
+     * @param amount amount of the coin to be burnt
+     *
+     * @dev you might want to use this if you're nervous `you might get liquidated` and want to just burn
+     */
+    function burnSV15C(uint256 amount) public override moreThanZero(amount) {
+        // Burn the coins
+        _burnSV15C(amount, msg.sender, msg.sender);
+        // We should revert the process, if the sender burns more coins than the collateral they hold.
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
+    /**
+     * This function will redeem your collateral,
+     * If you have SV15C minted, you will not be able to redeem until you burn your SV15C
+     *
+     * @param tokenCollateralAddress: The ERC20 token address of the collateral you're redeeming
+     * @param amountCollateral: The amount of collateral you're redeeming
+     *
+     * @notice This function will redeem the collateral after checking for the health factor (should be greater than 1 after the collateral is redeemed)
+     */
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral)
+        public
+        override
+        moreThanZero(amountCollateral)
+    {
+        _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
+        // We should revert the process, if the sender redeems more collateral than the collateral they hold.
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
+    /**
+     * This function will return the amount of tokens equivalent to a given amount of USD.
+     *
+     * @param tokenAddress The address of the token contract (wETH, wBTC)
+     * @param usdAmountInWei The amount of USD to get the token amount for
+     */
+    function getTokenAmountFromUsd(address tokenAddress, uint256 usdAmountInWei) public view returns (uint256) {
+        uint256 price = PriceFeeds.getTokenAmountFromUsd(s_priceFeeds[tokenAddress], usdAmountInWei);
+        return price;
+    }
     //////////////////////////////////////////////////////////////////////////////////////
     ////////                           PRIVATE / INTERNAL FUNCTIONS                         ////////
     /////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * This function will redeem the collateral.
+     *
+     * @param tokenCollateralAddress The ERC20 token address of the collateral you're redeeming
+     * @param amountCollateral The amount of collateral you're redeeming
+     * @param fromAddress The address from which the collateral is being redeemed
+     * @param toAddress The address to which the collateral is being redeemed
+     */
+    function _redeemCollateral(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        address fromAddress,
+        address toAddress
+    ) private moreThanZero(amountCollateral) {
+        // Update the collateral deposited mapping for the user
+        s_collateralDeposited[fromAddress][tokenCollateralAddress] -= amountCollateral;
+        // Emit the event.
+        emit CollateralRedeemed(fromAddress, toAddress, tokenCollateralAddress, amountCollateral);
+        // Transfer the collateral from the contract to the sender
+        bool success = IERC20(tokenCollateralAddress).transfer(toAddress, amountCollateral);
+        // If the transfer fails, revert.
+        if (!success) {
+            revert SV15CErrors.SV15CEngine__TokenTranferFailed();
+        }
+    }
+
+    /**
+     * This function will burn the coins.
+     *
+     * @param amount The amount of the coin to be burnt
+     *
+     * @dev low level function, don't call directly UNTIL the calling function doesn't check the health factor
+     */
+    function _burnSV15C(uint256 amount, address onBehalfOf, address sv15cProvider) private moreThanZero(amount) {
+        // Update the number of coins minted by the user
+        s_SVC15Minted[onBehalfOf] -= amount;
+        // Transfer the coins from the sender to the contract
+        bool success = i_sv15c.transferFrom(sv15cProvider, address(this), amount);
+        // If the transfer fails, revert.
+        if (!success) {
+            revert SV15CErrors.SV15CEngine__BurnFailed();
+        }
+        // Burn the coins using the SV15C contract's burn function
+        i_sv15c.burn(amount);
+    }
 
     /**
      * This function will revert the transaction if the health factor is broken.
@@ -282,6 +421,21 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
     /////////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * This function would tell the health factor of a person.
+     *
+     * @param totalCoinsMinted: total coins minted
+     * @param collateralValueInUsd: total collateral value in USD
+     */
+    function calculateHealthFactor(uint256 totalCoinsMinted, uint256 collateralValueInUsd)
+        public
+        pure
+        override
+        returns (uint256)
+    {
+        return HealthFactorCalculator.calculateHealthFactor(totalCoinsMinted, collateralValueInUsd);
+    }
+
+    /**
      * This function will return the total collateral value in USD for the user.
      *
      * @param userAddress user address we want to check health factor for
@@ -312,7 +466,44 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * This function would tell the health factor of the user.
      * @param userAddress user address we want to check health factor for
      */
-    function healthFactor(address userAddress) public view returns (uint256) {
+    function getHealthFactor(address userAddress) public view returns (uint256) {
         return _healthFactor(userAddress);
+    }
+
+    /**
+     * This function will return the amount of tokens equivalent to a given amount of USD.
+     * @param tokenAddress The address of the token contract
+     */
+    function getDepositedCollateral(address tokenAddress) public view returns (uint256) {
+        return s_collateralDeposited[msg.sender][tokenAddress];
+    }
+
+    /**
+     * This function will return the total coins minted by the user.
+     *
+     * @param userAddress user address we want to check health factor for
+     * @return totalSVC15Minted the total SVC15 minted by the user
+     * @return collateralValueInUsd the total collateral value in USD for the user
+     */
+    function getAccountInformation(address userAddress)
+        public
+        view
+        returns (uint256 totalSVC15Minted, uint256 collateralValueInUsd)
+    {
+        return _getAccountInformation(userAddress);
+    }
+
+    /**
+     * Thie function will return the additional feed precision.
+     */
+    function getAdditionalFeedPrecision() public pure returns (uint256) {
+        return SV15CConstants.ADDITIONAL_FEED_PRECISION;
+    }
+
+    /**
+     * This function will return the precision.
+     */
+    function getPrecision() public pure returns (uint256) {
+        return SV15CConstants.PRECISION;
     }
 }
