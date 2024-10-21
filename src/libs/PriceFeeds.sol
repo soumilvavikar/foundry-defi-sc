@@ -69,7 +69,6 @@ library PriceFeeds {
      * @param priceFeedAddress the address of the price feed
      */
     function getLatestPrice(address priceFeedAddress) private view returns (int256 price) {
-        console.log("priceFeedAddress: ", priceFeedAddress);
         AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeedAddress);
         (, price,,,) = priceFeed.latestRoundData();
         return price;

@@ -22,5 +22,9 @@ library TestConstants {
     uint256 public constant STARTING_USER_BALANCE = 10 ether;
     uint256 public constant AMOUNT_TO_MINT = 100 ether;
     uint256 public constant MIN_HEALTH_FACTOR = 1e18;
+
+    // Liquidation
+    address public constant LIQUIDATOR = address(0x2);
+    uint256 public constant COLLATERAL_TO_COVER = 20 ether;
     uint256 public constant LIQUIDATION_THRESHOLD = 50;
 }

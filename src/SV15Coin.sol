@@ -28,8 +28,7 @@ contract SV15C is ERC20Burnable, Ownable {
      * @return bool value
      */
     function mint(address _to, uint256 _amount) external onlyOwner returns (bool) {
-        _mint(_to, _amount);
-
+        // If the address is zero, don't mint, throw an error
         if (_to == address(0)) {
             revert SV15CErrors.SV15C__NotZeroAddress();
         }
@@ -39,6 +38,7 @@ contract SV15C is ERC20Burnable, Ownable {
             revert SV15CErrors.SV15C__AmountMustBeMoreThanZero();
         }
 
+        // Mint the tokens
         _mint(_to, _amount);
 
         return true;

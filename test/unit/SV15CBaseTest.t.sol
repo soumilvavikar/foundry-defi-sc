@@ -10,6 +10,7 @@ import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {SV15CErrors} from "../../src/libs/SV15CErrors.sol";
 import {TestConstants} from "../libs/TestConstants.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
+import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 
 /**
  * @title SV15CBaseTest
@@ -65,6 +66,35 @@ abstract contract SV15CBaseTest is Test {
         vm.startPrank(TestConstants.USER);
         ERC20Mock(weth).approve(address(engine), TestConstants.COLLATERAL_AMOUNT);
         engine.depositCollateral(weth, TestConstants.COLLATERAL_AMOUNT);
+        vm.stopPrank();
+        _;
+    }
+
+    /**
+     * @notice Modifier to liquidate a user
+     */
+    modifier liquidated() {
+        // Deposit collateral and mint sv15c
+        vm.startPrank(TestConstants.USER);
+        ERC20Mock(weth).approve(address(engine), TestConstants.COLLATERAL_AMOUNT);
+        engine.depositCollateralAndMintSV15C(weth, TestConstants.COLLATERAL_AMOUNT, TestConstants.AMOUNT_TO_MINT);
+        vm.stopPrank();
+        int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
+
+        // Crashing the price
+        MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
+        uint256 userHealthFactor = engine.getHealthFactor(TestConstants.USER);
+
+        // Mint some WETH to the liquidator
+        ERC20Mock(weth).mint(TestConstants.LIQUIDATOR, TestConstants.COLLATERAL_TO_COVER);
+
+        // Liquidate the user
+        vm.startPrank(TestConstants.LIQUIDATOR);
+        ERC20Mock(weth).approve(address(engine), TestConstants.COLLATERAL_TO_COVER);
+        engine.depositCollateralAndMintSV15C(weth, TestConstants.COLLATERAL_TO_COVER, TestConstants.AMOUNT_TO_MINT);
+        sv15c.approve(address(engine), TestConstants.AMOUNT_TO_MINT);
+        // We are covering their whole debt
+        engine.liquidate(weth, TestConstants.USER, TestConstants.AMOUNT_TO_MINT); 
         vm.stopPrank();
         _;
     }

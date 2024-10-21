@@ -77,12 +77,8 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
 
         // USD Price Feeds. ETH to USD / BTC to USD
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
-            console.log("tokenAddresses[i]: ", tokenAddresses[i]);
-
             s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
             i_collateralTokens[i] = tokenAddresses[i];
-
-            console.log("s_priceFeeds[tokenAddresses[i]]: ", s_priceFeeds[tokenAddresses[i]]);
         }
 
         // Setting the address of the SV15C contract
@@ -178,7 +174,6 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
             // If the health factor of the user is greater than minimum health factor, revert.
             revert SV15CErrors.SV15CEngine__HealthFactorOk();
         }
-
         // Step 1: Get the total collateral value in USD for the tokens used as collateral by the user
         uint256 tokenAmountToCoverDebt = getTokenAmountFromUsd(collateralTokenAddress, debtToCover);
         // Step 2: Calculate the bonus for the liquidator
@@ -200,11 +195,10 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
 
         // Step 6: Check the health factor of the user after liquidation
         uint256 endingHealthFactor = _healthFactor(user);
-        if (startingHealthFactor <= endingHealthFactor) {
+        if (startingHealthFactor >= endingHealthFactor) {
             // If the health factor of the user is greater than minimum health factor, revert.
             revert SV15CErrors.SV15CEngine__HealthFactorNotImproved();
         }
-
         // Step 7: Check health factor of the liquidator
         _revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -248,8 +242,11 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * @notice the minter should have more collateral value than the amount of coins they mint.
      */
     function mintSV15C(uint256 amountToMint) public moreThanZero(amountToMint) nonReentrant {
+        console.log("mintSV15C: amountToMint: ", amountToMint);
         // Update the number of coins minted by the user
         s_SVC15Minted[msg.sender] += amountToMint;
+
+        console.log("mintSV15C: s_SVC15Minted[msg.sender]: ", s_SVC15Minted[msg.sender]);
         // We should revert the process, if the sender mints more coins than the collateral they hold.
         _revertIfHealthFactorIsBroken(msg.sender);
         // Once the heath factor is checked, mint the SV15C coins
@@ -406,6 +403,7 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
         view
         returns (uint256 totalCollateralValueInUsd)
     {
+        console.log("_getAccountCollateralValueInUsd: i_collateralTokens.length: ", i_collateralTokens.length);
         // Iterate through array of possible tokens and find the total value in USD for all tokens combined.
         for (uint256 i = 0; i < i_collateralTokens.length; i++) {
             address tokenAddress = i_collateralTokens[i];
@@ -506,4 +504,33 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
     function getPrecision() public pure returns (uint256) {
         return SV15CConstants.PRECISION;
     }
+
+    /**
+     * This function will return the liquidation threshold.
+     */
+    function getLiquidationThreshold() external pure returns (uint256) {
+        return SV15CConstants.LIQUIDATION_THRESHOLD;
+    }
+
+    /**
+     * This function will return the liquidation bonus.
+     */
+    function getLiquidationBonus() external pure returns (uint256) {
+        return SV15CConstants.LIQUIDATION_BONUS;
+    }
+
+    /**
+     * This function will return the liquidation precision.
+     */
+    function getLiquidationPrecision() external pure returns (uint256) {
+        return SV15CConstants.LIQUIDATION_PRECISION;
+    }
+
+    /**
+     * This function will return the minimum health factor.
+     */
+    function getMinHealthFactor() external pure returns (uint256) {
+        return SV15CConstants.MIN_HEALTH_FACTOR;
+    }
+
 }
