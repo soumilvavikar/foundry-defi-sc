@@ -7,4 +7,13 @@ remappings = [
     '@chainlink/contracts/=lib/chainlink-brownie-contracts/contracts/',
     '@openzeppelin/contracts=lib/openzeppelin-contracts/contracts',
 ]
+
+[invariant]
+# Enable invariant checking
+run = 128
+depth = 128
+fail_on_revert = true
+# In fuzz tests, to set the fail_on_revert to false, use the following line just above the test function
+# /// forge-config: default.invariant.fail-on-revert = false
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

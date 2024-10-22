@@ -37,7 +37,8 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
     // @dev mapping between the token (ETH/BTC) to the Chainlink pricefeeds
     mapping(address token => address priceFeed) private s_priceFeeds;
     // @dev mapping for the collateral deposisted by a user
-    mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
+    mapping(address user => mapping(address token => uint256 amount))
+        private s_collateralDeposited;
     // @dev mapping for storing coins minted by the user.
     mapping(address user => uint256 amountOfCoinsMinted) private s_SVC15Minted;
     // @dev - if we have the final list of tokens this stablecoin will support, we can make it immutable OR we can make it a private state variable.
@@ -46,8 +47,17 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
     //////////////////////////////////////////////////////////////////////////////////////
     ////////                           EVENTS                                    ////////
     /////////////////////////////////////////////////////////////////////////////////////
-    event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
-    event CollateralRedeemed(address indexed redeemedFrom, address indexed redeemedTo, address token, uint256 amount);
+    event CollateralDeposited(
+        address indexed user,
+        address indexed token,
+        uint256 indexed amount
+    );
+    event CollateralRedeemed(
+        address indexed redeemedFrom,
+        address indexed redeemedTo,
+        address token,
+        uint256 amount
+    );
 
     //////////////////////////////////////////////////////////////////////////////////////
     ////////                           MODIFIERS                                 ////////
@@ -70,9 +80,14 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
     //////////////////////////////////////////////////////////////////////////////////////
     ////////                           CONSTRUCTOR                               ////////
     /////////////////////////////////////////////////////////////////////////////////////
-    constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address svcAddress) {
+    constructor(
+        address[] memory tokenAddresses,
+        address[] memory priceFeedAddresses,
+        address svcAddress
+    ) {
         if (tokenAddresses.length != priceFeedAddresses.length) {
-            revert SV15CErrors.SV15CEngine__IncorrectTokenAddressToPriceFeedInfo();
+            revert SV15CErrors
+                .SV15CEngine__IncorrectTokenAddressToPriceFeedInfo();
         }
 
         // USD Price Feeds. ETH to USD / BTC to USD
@@ -147,12 +162,11 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * anyone.
      * For example, if the price of the collateral plummeted before anyone could be liquidated.
      */
-    function liquidate(address collateralTokenAddress, address user, uint256 debtToCover)
-        external
-        override
-        moreThanZero(debtToCover)
-        nonReentrant
-    {
+    function liquidate(
+        address collateralTokenAddress,
+        address user,
+        uint256 debtToCover
+    ) external override moreThanZero(debtToCover) nonReentrant {
         /**
          * Initially if collateral deposited (ETH / BTC) is worth 150 USD and 100 SV15C coins are minted, the health factor is 1.5 (considering 1 USD = 1 SV15C coin)
          * But,
@@ -175,7 +189,10 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
             revert SV15CErrors.SV15CEngine__HealthFactorOk();
         }
         // Step 1: Get the total collateral value in USD for the tokens used as collateral by the user
-        uint256 tokenAmountToCoverDebt = getTokenAmountFromUsd(collateralTokenAddress, debtToCover);
+        uint256 tokenAmountToCoverDebt = getTokenAmountFromUsd(
+            collateralTokenAddress,
+            debtToCover
+        );
         // Step 2: Calculate the bonus for the liquidator
         /**
          * Token amount to cover debt = 100 USD
@@ -183,13 +200,20 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
          * Bonus = (100 * 10) / 100 = 10 USD
          * Liquidator would get 110 USD worth of collateral
          */
-        uint256 bonusCollateral =
-            (tokenAmountToCoverDebt * SV15CConstants.LIQUIDATION_BONUS) / SV15CConstants.LIQUIDATION_PRECISION;
+        uint256 bonusCollateral = (tokenAmountToCoverDebt *
+            SV15CConstants.LIQUIDATION_BONUS) /
+            SV15CConstants.LIQUIDATION_PRECISION;
         // Step 3: Total collateral to take from the user
-        uint256 totalCollateralToTake = tokenAmountToCoverDebt + bonusCollateral;
+        uint256 totalCollateralToTake = tokenAmountToCoverDebt +
+            bonusCollateral;
 
         // Step 4: Redeem the collateral from the user
-        _redeemCollateral(collateralTokenAddress, totalCollateralToTake, user, msg.sender);
+        _redeemCollateral(
+            collateralTokenAddress,
+            totalCollateralToTake,
+            user,
+            msg.sender
+        );
         // Step 5: Burn the coins to cover the debt
         _burnSV15C(debtToCover, user, msg.sender);
 
@@ -214,18 +238,31 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * @param tokenCollateralAddress collateral address
      * @param collateralAmount amount collateral
      */
-    function depositCollateral(address tokenCollateralAddress, uint256 collateralAmount)
+    function depositCollateral(
+        address tokenCollateralAddress,
+        uint256 collateralAmount
+    )
         public
         moreThanZero(collateralAmount)
         isAllowedToken(tokenCollateralAddress)
         nonReentrant
     {
         // Update the collateral deposited mapping for the user
-        s_collateralDeposited[msg.sender][tokenCollateralAddress] += collateralAmount;
+        s_collateralDeposited[msg.sender][
+            tokenCollateralAddress
+        ] += collateralAmount;
         // Emit the event.
-        emit CollateralDeposited(msg.sender, tokenCollateralAddress, collateralAmount);
+        emit CollateralDeposited(
+            msg.sender,
+            tokenCollateralAddress,
+            collateralAmount
+        );
         // Transfer the collateral from the sender to the contract
-        bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), collateralAmount);
+        bool success = IERC20(tokenCollateralAddress).transferFrom(
+            msg.sender,
+            address(this),
+            collateralAmount
+        );
         // If the transfer fails, revert.
         if (!success) {
             revert SV15CErrors.SV15CEngine__TokenTranferFailed();
@@ -241,12 +278,17 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * @dev This function also follows CEI
      * @notice the minter should have more collateral value than the amount of coins they mint.
      */
-    function mintSV15C(uint256 amountToMint) public moreThanZero(amountToMint) nonReentrant {
+    function mintSV15C(
+        uint256 amountToMint
+    ) public moreThanZero(amountToMint) nonReentrant {
         console.log("mintSV15C: amountToMint: ", amountToMint);
         // Update the number of coins minted by the user
         s_SVC15Minted[msg.sender] += amountToMint;
 
-        console.log("mintSV15C: s_SVC15Minted[msg.sender]: ", s_SVC15Minted[msg.sender]);
+        console.log(
+            "mintSV15C: s_SVC15Minted[msg.sender]: ",
+            s_SVC15Minted[msg.sender]
+        );
         // We should revert the process, if the sender mints more coins than the collateral they hold.
         _revertIfHealthFactorIsBroken(msg.sender);
         // Once the heath factor is checked, mint the SV15C coins
@@ -279,12 +321,16 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      *
      * @notice This function will redeem the collateral after checking for the health factor (should be greater than 1 after the collateral is redeemed)
      */
-    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral)
-        public
-        override
-        moreThanZero(amountCollateral)
-    {
-        _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
+    function redeemCollateral(
+        address tokenCollateralAddress,
+        uint256 amountCollateral
+    ) public override moreThanZero(amountCollateral) {
+        _redeemCollateral(
+            tokenCollateralAddress,
+            amountCollateral,
+            msg.sender,
+            msg.sender
+        );
         // We should revert the process, if the sender redeems more collateral than the collateral they hold.
         _revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -295,10 +341,17 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * @param tokenAddress The address of the token contract (wETH, wBTC)
      * @param usdAmountInWei The amount of USD to get the token amount for
      */
-    function getTokenAmountFromUsd(address tokenAddress, uint256 usdAmountInWei) public view returns (uint256) {
-        uint256 price = PriceFeeds.getTokenAmountFromUsd(s_priceFeeds[tokenAddress], usdAmountInWei);
+    function getTokenAmountFromUsd(
+        address tokenAddress,
+        uint256 usdAmountInWei
+    ) public view returns (uint256) {
+        uint256 price = PriceFeeds.getTokenAmountFromUsd(
+            s_priceFeeds[tokenAddress],
+            usdAmountInWei
+        );
         return price;
     }
+
     //////////////////////////////////////////////////////////////////////////////////////
     ////////                           PRIVATE / INTERNAL FUNCTIONS                         ////////
     /////////////////////////////////////////////////////////////////////////////////////
@@ -318,11 +371,21 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
         address toAddress
     ) private moreThanZero(amountCollateral) {
         // Update the collateral deposited mapping for the user
-        s_collateralDeposited[fromAddress][tokenCollateralAddress] -= amountCollateral;
+        s_collateralDeposited[fromAddress][
+            tokenCollateralAddress
+        ] -= amountCollateral;
         // Emit the event.
-        emit CollateralRedeemed(fromAddress, toAddress, tokenCollateralAddress, amountCollateral);
+        emit CollateralRedeemed(
+            fromAddress,
+            toAddress,
+            tokenCollateralAddress,
+            amountCollateral
+        );
         // Transfer the collateral from the contract to the sender
-        bool success = IERC20(tokenCollateralAddress).transfer(toAddress, amountCollateral);
+        bool success = IERC20(tokenCollateralAddress).transfer(
+            toAddress,
+            amountCollateral
+        );
         // If the transfer fails, revert.
         if (!success) {
             revert SV15CErrors.SV15CEngine__TokenTranferFailed();
@@ -336,11 +399,19 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      *
      * @dev low level function, don't call directly UNTIL the calling function doesn't check the health factor
      */
-    function _burnSV15C(uint256 amount, address onBehalfOf, address sv15cProvider) private moreThanZero(amount) {
+    function _burnSV15C(
+        uint256 amount,
+        address onBehalfOf,
+        address sv15cProvider
+    ) private moreThanZero(amount) {
         // Update the number of coins minted by the user
         s_SVC15Minted[onBehalfOf] -= amount;
         // Transfer the coins from the sender to the contract
-        bool success = i_sv15c.transferFrom(sv15cProvider, address(this), amount);
+        bool success = i_sv15c.transferFrom(
+            sv15cProvider,
+            address(this),
+            amount
+        );
         // If the transfer fails, revert.
         if (!success) {
             revert SV15CErrors.SV15CEngine__BurnFailed();
@@ -359,7 +430,9 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
         uint256 userHealthFactor = _healthFactor(userAddress);
         // If the health factor is below the minimum allowed health factor, revert.
         if (userHealthFactor < SV15CConstants.MIN_HEALTH_FACTOR) {
-            revert SV15CErrors.SV15CEngine__BreaksHealthFactor(userHealthFactor);
+            revert SV15CErrors.SV15CEngine__BreaksHealthFactor(
+                userHealthFactor
+            );
         }
     }
 
@@ -370,9 +443,16 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      */
     function _healthFactor(address userAddress) private view returns (uint256) {
         // Get the total coins minted and total collateral value in USD for the user
-        (uint256 totalSVC15Minted, uint256 collateralValueInUsd) = _getAccountInformation(userAddress);
+        (
+            uint256 totalSVC15Minted,
+            uint256 collateralValueInUsd
+        ) = _getAccountInformation(userAddress);
         // Use the total coins minted and total collateral value in USD to determine the health factor of the user.
-        return HealthFactorCalculator.calculateHealthFactor(totalSVC15Minted, collateralValueInUsd);
+        return
+            HealthFactorCalculator.calculateHealthFactor(
+                totalSVC15Minted,
+                collateralValueInUsd
+            );
     }
 
     /**
@@ -380,7 +460,9 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      *
      * @param userAddress user address we want to check health factor for
      */
-    function _getAccountInformation(address userAddress)
+    function _getAccountInformation(
+        address userAddress
+    )
         private
         view
         returns (uint256 totalSVC15Minted, uint256 collateralValueInUsd)
@@ -398,17 +480,23 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      *
      * @param userAddress user address we want to check health factor for
      */
-    function _getAccountCollateralValueInUsd(address userAddress)
-        internal
-        view
-        returns (uint256 totalCollateralValueInUsd)
-    {
-        console.log("_getAccountCollateralValueInUsd: i_collateralTokens.length: ", i_collateralTokens.length);
+    function _getAccountCollateralValueInUsd(
+        address userAddress
+    ) internal view returns (uint256 totalCollateralValueInUsd) {
+        console.log(
+            "_getAccountCollateralValueInUsd: i_collateralTokens.length: ",
+            i_collateralTokens.length
+        );
         // Iterate through array of possible tokens and find the total value in USD for all tokens combined.
         for (uint256 i = 0; i < i_collateralTokens.length; i++) {
             address tokenAddress = i_collateralTokens[i];
-            uint256 amountOfTokens = s_collateralDeposited[userAddress][tokenAddress];
-            totalCollateralValueInUsd += PriceFeeds.getUsdValueOfToken(s_priceFeeds[tokenAddress], amountOfTokens);
+            uint256 amountOfTokens = s_collateralDeposited[userAddress][
+                tokenAddress
+            ];
+            totalCollateralValueInUsd += PriceFeeds.getUsdValueOfToken(
+                s_priceFeeds[tokenAddress],
+                amountOfTokens
+            );
         }
         // The return statement is optional (as returns has the variable defined)
         return totalCollateralValueInUsd;
@@ -424,13 +512,15 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * @param totalCoinsMinted: total coins minted
      * @param collateralValueInUsd: total collateral value in USD
      */
-    function calculateHealthFactor(uint256 totalCoinsMinted, uint256 collateralValueInUsd)
-        public
-        pure
-        override
-        returns (uint256)
-    {
-        return HealthFactorCalculator.calculateHealthFactor(totalCoinsMinted, collateralValueInUsd);
+    function calculateHealthFactor(
+        uint256 totalCoinsMinted,
+        uint256 collateralValueInUsd
+    ) public pure override returns (uint256) {
+        return
+            HealthFactorCalculator.calculateHealthFactor(
+                totalCoinsMinted,
+                collateralValueInUsd
+            );
     }
 
     /**
@@ -438,11 +528,9 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      *
      * @param userAddress user address we want to check health factor for
      */
-    function getAccountCollateralValueInUsd(address userAddress)
-        public
-        view
-        returns (uint256 totalCollateralValueInUsd)
-    {
+    function getAccountCollateralValueInUsd(
+        address userAddress
+    ) public view returns (uint256 totalCollateralValueInUsd) {
         return _getAccountCollateralValueInUsd(userAddress);
     }
 
@@ -452,19 +540,24 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * @param tokenAddress The address of the token contract
      * @param amountOfTokens The amount of tokens to get the USD value for
      */
-    function getUsdValueOfToken(address tokenAddress, uint256 amountOfTokens)
-        public
-        view
-        returns (uint256 usdValueOfToken)
-    {
-        return PriceFeeds.getUsdValueOfToken(s_priceFeeds[tokenAddress], amountOfTokens);
+    function getUsdValueOfToken(
+        address tokenAddress,
+        uint256 amountOfTokens
+    ) public view returns (uint256 usdValueOfToken) {
+        return
+            PriceFeeds.getUsdValueOfToken(
+                s_priceFeeds[tokenAddress],
+                amountOfTokens
+            );
     }
 
     /**
      * This function would tell the health factor of the user.
      * @param userAddress user address we want to check health factor for
      */
-    function getHealthFactor(address userAddress) public view returns (uint256) {
+    function getHealthFactor(
+        address userAddress
+    ) public view returns (uint256) {
         return _healthFactor(userAddress);
     }
 
@@ -472,7 +565,9 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * This function will return the amount of tokens equivalent to a given amount of USD.
      * @param tokenAddress The address of the token contract
      */
-    function getDepositedCollateral(address tokenAddress) public view returns (uint256) {
+    function getDepositedCollateral(
+        address tokenAddress
+    ) public view returns (uint256) {
         return s_collateralDeposited[msg.sender][tokenAddress];
     }
 
@@ -483,7 +578,9 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
      * @return totalSVC15Minted the total SVC15 minted by the user
      * @return collateralValueInUsd the total collateral value in USD for the user
      */
-    function getAccountInformation(address userAddress)
+    function getAccountInformation(
+        address userAddress
+    )
         public
         view
         returns (uint256 totalSVC15Minted, uint256 collateralValueInUsd)
@@ -533,4 +630,39 @@ contract SV15CEngine is SV15CEngineInterface, ReentrancyGuard {
         return SV15CConstants.MIN_HEALTH_FACTOR;
     }
 
+    /**
+     * This function will return the collateral tokens.
+     */
+    function getCollateralTokens() external view returns (address[2] memory) {
+        return i_collateralTokens;
+    }
+
+    /**
+     * This function will return the collateral token price feed.
+     * @param tokenAddress The address of the token contract
+     */
+    function getCollateralTokenPriceFeed(
+        address tokenAddress
+    ) external view returns (address) {
+        return s_priceFeeds[tokenAddress];
+    }
+
+    /**
+     * This function will return the collateral balance of the user.
+     * @param userAddress The address of the user
+     * @param tokenAddress The address of the token contract
+     */
+    function getCollateralBalanceOfUser(
+        address userAddress,
+        address tokenAddress
+    ) external view returns (uint256) {
+        return s_collateralDeposited[userAddress][tokenAddress];
+    }
+
+    /**
+     * This function will return the SV15C contract address.
+     */
+    function getSv15c() external view returns (address) {
+        return address(i_sv15c);
+    }
 }
