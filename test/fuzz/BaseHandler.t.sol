@@ -3,8 +3,8 @@
 pragma solidity ^0.8.27;
 
 import {Test, console} from "forge-std/Test.sol";
-import {SV15C} from "../../../src/SV15Coin.sol";
-import {SV15CEngine} from "../../../src/SV15CEngine.sol";
+import {SV15C} from "src/SV15Coin.sol";
+import {SV15CEngine} from "src/SV15CEngine.sol";
 import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 

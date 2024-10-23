@@ -79,3 +79,32 @@ forge coverage --no-match-test RevertFalse
 ```
 
 ![Code Coverage](readme-docs/readme-imgs/code-coverage.png)
+
+## Deploy the Contract to the Local Anvil Chain
+
+```shell
+# This command will simulate the deployment to the local anvil chain where we have mocked the AggregatorV3Interface, i.e. Chainlink - PriceFeed calls.
+forge script  script/DeploySV15C.s.sol --rpc-url http://127.0.0.1:8545
+
+# broadcast the contract to actually deploy
+forge script  script/DeploySV15C.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
+```
+
+**NOTE**: Here instead of using the vanilla anvil local chain, we can also use a forked mainnet to test in more close to actual mainnet environment.
+
+**Deployment Simulation**:
+
+![Simulation](readme-imgs/simulate-deployment.png)
+
+**Deployment**:
+
+![Deploy 1](readme-imgs/deployment-1.png)
+![Deploy 2](readme-imgs/deployment-2.png)
+
+**Logs on Anvil Local Chain**:
+
+![Deployment Logs](readme-imgs/deployment-logs-on-chain.png)
+
+## Interacting with the SV15CEngine to Mint and Burn SV15C token
+
+TBD
