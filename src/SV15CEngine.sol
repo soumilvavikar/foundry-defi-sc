@@ -10,7 +10,6 @@ import {PriceFeeds} from "./libs/PriceFeeds.sol";
 import {HealthFactorCalculator} from "./libs/HealthFactorCalculator.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {console} from "forge-std/console.sol";
 
 /**

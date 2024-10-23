@@ -25,4 +25,6 @@ library SV15CErrors {
     error SV15CEngine__HealthFactorNotImproved();
     error SV15CEngine__MintFailed();
     error SV15CEngine__BurnFailed();
+
+    error AggregatorV3Lib__StalePrice();
 }
