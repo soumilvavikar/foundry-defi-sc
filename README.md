@@ -12,7 +12,8 @@ Before getting started with the example here, it is essential to understand what
 - **Collateral**: Exogenous, we will use cryptocurrencies
   - ETH
   - BTC
-  We would use the ERC21 version of ETH and BTC - wETH and wBTC
+
+ We would use the ERC21 version of ETH and BTC - wETH and wBTC
 
 ## Initial Setup
 
